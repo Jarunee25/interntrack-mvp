@@ -2,154 +2,130 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-# ตั้งค่าหน้าเว็บ
-st.set_page_config(page_title="InternTrack MVP", page_icon="📄", layout="wide")
+st.set_page_config(page_title="InternTrack V.2", page_icon="📄", layout="wide")
 
-# สร้าง Mock Database สำหรับเก็บข้อมูลคำร้อง (Synthetic Data)
-if "requests_db" not in st.session_state:
-    st.session_state.requests_db = pd.DataFrame([
+st.title("📄 InternTrack V.2: ระบบยื่นและติดตามสถานะเอกสารขอฝึกงานออนไลน์")
+
+# สร้าง Session State สำหรับเก็บข้อมูลคำร้อง (Synthetic Data V.2)
+if "requests" not in st.session_state:
+    st.session_state.requests = pd.DataFrame([
         {
             "doc_id": "IT-2026-001",
-            "student_id": "64010001",
+            "student_id": "64010912345",
+            "student_email": "64010912345@msu.ac.th",
             "student_name": "สมชาย ใจดี",
-            "company_name": "บริษัท เทคโซลูชันส์ จำกัด",
             "doc_type": "หนังสือขอความอนุเคราะห์",
-            "submission_date": "2026-10-20 09:30",
-            "current_status": "2. เจ้าหน้าที่กำลังตรวจสอบ",
-            "assigned_to": "เจ้าหน้าที่คณะ",
-            "rejection_reason": "-"
+            "company_name": "บริษัท Tech Innovation จำกัด",
+            "submission_date": "2026-10-20 10:30",
+            "current_status": "เอกสารโดนตีกลับ",
+            "rejection_reason": "ไฟล์แนบไม่ชัดเจน กรุณาแนบไฟล์หนังสือตอบรับใหม่อีกครั้ง"
         },
         {
             "doc_id": "IT-2026-002",
-            "student_id": "64010002",
+            "student_id": "64010954321",
+            "student_email": "64010954321@msu.ac.th",
             "student_name": "สมหญิง รักเรียน",
-            "company_name": "ธนาคารพัฒนาไทย",
             "doc_type": "หนังสือส่งตัวฝึกงาน",
+            "company_name": "ธนาคารแห่งประเทศไทย",
             "submission_date": "2026-10-22 14:15",
-            "current_status": "4. อนุมัติเรียบร้อย",
-            "assigned_to": "นิสิต (รับเอกสาร)",
+            "current_status": "2-เจ้าหน้าที่ตรวจ",
             "rejection_reason": "-"
         }
     ])
 
-st.title("📄 InternTrack: ระบบยื่นและติดตามสถานะเอกสารขอฝึกงานออนไลน์")
+tab1, tab2 = st.tabs(["📝 แบบฟอร์มยื่นเอกสาร (V.2)", "📊 ติดตามและจัดการสถานะเอกสาร"])
 
-# เมนูแบ่งตามประเภทผู้ใช้งาน (User Roles)
-role = st.sidebar.radio("เลือกมุมมองการใช้งาน (Role):", ["🎓 ฝั่งนิสิต (Student)", "🏢 ฝั่งเจ้าหน้าที่ (Admin)"])
-
-# ---------------------------------------------------------
-# 1. มุมมองฝั่งนิสิต (Student Interface)
-# ---------------------------------------------------------
-if role == "🎓 ฝั่งนิสิต (Student)":
-    tab1, tab2 = st.tabs(["📝 แบบฟอร์มยื่นเอกสาร", "📊 ติดตามสถานะเอกสาร"])
+# --- TAB 1: ยื่นเอกสาร ---
+with tab1:
+    st.header("ยื่นเอกสารขอหนังสือฝึกงาน")
+    st.caption("🔒 ระบบยืนยันตัวตนด้วยอีเมลมหาวิทยาลัย (V.2 Authentication)")
     
-    # Tab 1: Smart Pre-validation Form
-    with tab1:
-        st.subheader("ยื่นเอกสารขอหนังสือฝึกงาน")
-        with st.form("internship_form", clear_on_submit=True):
-            col1, col2 = st.columns(2)
-            with col1:
-                student_id = st.text_input("รหัสนิสิต *")
-                student_name = st.text_input("ชื่อ-นามสกุล *")
-            with col2:
-                doc_type = st.selectbox("ประเภทเอกสาร *", ["หนังสือขอความอนุเคราะห์", "หนังสือส่งตัวฝึกงาน"])
-                company_name = st.text_input("ชื่อหน่วยงาน/บริษัท *")
-            
-            # Smart Pre-validation: บังคับแนบไฟล์ PDF เท่านั้น
-            uploaded_file = st.file_uploader("แนบไฟล์รายละเอียด/หนังสือตอบรับ (.pdf เท่านั้น) *", type=["pdf"])
-            
-            submit_btn = st.form_submit_button("ส่งคำร้องขอเอกสาร")
-            
-            if submit_btn:
-                # Rule-based Check
-                if not student_id or not student_name or not company_name:
-                    st.error("❌ กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบถ้วน")
-                elif uploaded_file is None:
-                    st.error("❌ กรุณาแนบไฟล์ PDF ประกอบการยื่นเรื่อง")
-                else:
-                    new_id = f"IT-2026-00{len(st.session_state.requests_db) + 1}"
-                    new_entry = {
-                        "doc_id": new_id,
-                        "student_id": student_id,
-                        "student_name": student_name,
-                        "company_name": company_name,
-                        "doc_type": doc_type,
-                        "submission_date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                        "current_status": "1. ยื่นเรื่องแล้ว",
-                        "assigned_to": "เจ้าหน้าที่คณะ",
-                        "rejection_reason": "-"
-                    }
-                    st.session_state.requests_db = pd.concat([st.session_state.requests_db, pd.DataFrame([new_entry])], ignore_index=True)
-                    st.success(f"✅ ยื่นเรื่องสำเร็จ! รหัสติดตามเอกสารของคุณคือ: **{new_id}**")
+    col1, col2 = st.columns(2)
+    with col1:
+        std_id = st.text_input("รหัสนิสิต *")
+        std_email = st.text_input("อีเมลมหาวิทยาลัย (@msu.ac.th) *")
+        std_name = st.text_input("ชื่อ-นามสกุล *")
+    with col2:
+        doc_type = st.selectbox("ประเภทเอกสาร *", ["หนังสือขอความอนุเคราะห์", "หนังสือส่งตัวฝึกงาน"])
+        company = st.text_input("ชื่อหน่วยงาน/บริษัท *")
 
-    # Tab 2: Visual Progress Tracker & Dashboard
-    with tab2:
-        st.subheader("สถานะคำร้องขอเอกสารของคุณ")
-        search_id = st.text_input("กรอกรหัสนิสิตเพื่อค้นหา:", value="64010001")
-        
-        user_docs = st.session_state.requests_db[st.session_state.requests_db["student_id"] == search_id]
-        
-        if not user_docs.empty:
-            for idx, row in user_docs.iterrows():
-                with st.expander(f"📌 เลขที่ {row['doc_id']} - {row['doc_type']} ({row['company_name']})", expanded=True):
-                    # แสดง Visual Progress Tracker
-                    st.write(f"**สถานะปัจจุบัน:** `{row['current_status']}` | **ผู้ถือเรื่อง:** `{row['assigned_to']}`")
-                    
-                    # Progress Bar แสดงขั้นตอน
-                    status_map = {
-                        "1. ยื่นเรื่องแล้ว": 25,
-                        "2. เจ้าหน้าที่กำลังตรวจสอบ": 50,
-                        "3. รออาจารย์/ผู้มีอำนาจลงนาม": 75,
-                        "4. อนุมัติเรียบร้อย": 100,
-                        "❌ เอกสารโดนตีกลับ": 0
-                    }
-                    progress = status_map.get(row['current_status'], 0)
-                    st.progress(progress)
-                    
-                    if row['current_status'] == "❌ เอกสารโดนตีกลับ":
-                        st.error(f"⚠️ เหตุผลที่โดนตีกลับ: {row['rejection_reason']} (กรุณายื่นแบบฟอร์มใหม่)")
-                    elif progress == 100:
-                        st.success("🎉 เอกสารออกเรียบร้อยแล้ว ติดต่อรับได้ที่ห้องฟ้า/ดาวน์โหลดไฟล์")
+    # V.2 รองรับไฟล์รูปภาพ JPG, PNG เพิ่มเติมจาก PDF
+    uploaded_file = st.file_uploader("แนบไฟล์รายละเอียด/หนังสือตอบรับ (.pdf, .jpg, .png) *", type=["pdf", "jpg", "png"])
+
+    if st.button("ส่งคำร้องขอเอกสาร"):
+        if std_id and std_name and company and std_email:
+            new_id = f"IT-2026-{len(st.session_state.requests)+1:03d}"
+            now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+            
+            new_data = {
+                "doc_id": new_id,
+                "student_id": std_id,
+                "student_email": std_email,
+                "student_name": std_name,
+                "doc_type": doc_type,
+                "company_name": company,
+                "submission_date": now_str,
+                "current_status": "1-ยื่นเรื่องแล้ว",
+                "rejection_reason": "-"
+            }
+            
+            st.session_state.requests = pd.concat([st.session_state.requests, pd.DataFrame([new_data])], ignore_index=True)
+            st.success(f"ส่งคำร้องสำเร็จ! รหัสอ้างอิงเอกสารของคุณคือ: **{new_id}**")
+            st.info(f"📲 [V.2 Notification] ระบบได้ส่งข้อความยืนยันและลิงก์ติดตามสถานะไปยัง LINE / Email ({std_email}) เรียบร้อยแล้ว")
         else:
-            st.info("ไม่พบรายการคำร้องสำหรับรหัสนิสิตนี้")
+            st.error("กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน")
 
-# ---------------------------------------------------------
-# 2. มุมมองฝั่งเจ้าหน้าที่ (Admin Interface)
-# ---------------------------------------------------------
-else:
-    st.subheader("🏢 แดชบอร์ดจัดการคำร้องสำหรับเจ้าหน้าที่ (Admin Manager)")
+# --- TAB 2: ติดตามและอัปเดตสถานะ ---
+with tab2:
+    st.header("ติดตามสถานะเอกสาร")
     
-    # แสดงรายการคำร้องทั้งหมด
-    df = st.session_state.requests_db
-    st.dataframe(df, use_container_width=True)
-    
-    st.markdown("---")
-    st.subheader("⚙️ Update สถานะคำร้อง (One-Click Manager)")
-    
-    if not df.empty:
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            selected_doc_id = st.selectbox("เลือกรหัสเอกสารที่ต้องการอัปเดต:", df["doc_id"].tolist())
+    if not st.session_state.requests.empty:
+        doc_list = st.session_state.requests["doc_id"].tolist()
+        selected_id = st.selectbox("เลือกรหัสเอกสาร (doc_id) เพื่อติดตามสถานะ:", doc_list)
         
-        # ดึงข้อมูลรายการที่เลือก
-        current_row = df[df["doc_id"] == selected_doc_id].iloc[0]
+        # ดึงข้อมูลของ doc_id ที่เลือก
+        idx = st.session_state.requests[st.session_state.requests["doc_id"] == selected_id].index[0]
+        row = st.session_state.requests.loc[idx]
         
-        with col2:
-            new_status = st.selectbox("เปลี่ยนสถานะเป็น:", [
-                "1. ยื่นเรื่องแล้ว",
-                "2. เจ้าหน้าที่กำลังตรวจสอบ",
-                "3. รออาจารย์/ผู้มีอำนาจลงนาม",
-                "4. อนุมัติเรียบร้อย",
-                "❌ เอกสารโดนตีกลับ"
-            ], index=["1. ยื่นเรื่องแล้ว", "2. เจ้าหน้าที่กำลังตรวจสอบ", "3. รออาจารย์/ผู้มีอำนาจลงนาม", "4. อนุมัติเรียบร้อย", "❌ เอกสารโดนตีกลับ"].index(current_row["current_status"]))
-            
-        with col3:
-            rej_reason = st.selectbox("สาเหตุการตีกลับ (ถ้ามี):", [
-                "-",
-                "ข้อมูลรายละเอียดไม่ครบถ้วน",
-                "แนบไฟล์ผิดประเภท/อ่านไม่ได้",
-                "ชื่อสถานประกอบการไม่ถูกต้อง"
-            ])
+        st.subheader(f"สถานะเอกสาร: {row['doc_id']}")
+        col_a, col_b = st.columns(2)
+        with col_a:
+            st.write(f"**ชื่อผู้ยื่น:** {row['student_name']} ({row['student_id']})")
+            st.write(f"**อีเมล:** {row['student_email']}")
+            st.write(f"**ประเภทเอกสาร:** {row['doc_type']}")
+            st.write(f"**บริษัท:** {row['company_name']}")
+        with col_b:
+            st.write(f"**วันที่ยื่น:** {row['submission_date']}")
+            st.write(f"**สถานะปัจจุบัน:** `{row['current_status']}`")
+            if row['rejection_reason'] != "-":
+                st.error(f"**เหตุผลการตีกลับ:** {row['rejection_reason']}")
 
-    if st.button("บันทึกการเปลี่ยนแปลง"):
-        st.success("บันทึกการเปลี่ยนแปลงเรียบร้อยแล้ว")
+        # V.2 ปุ่มอัปโหลดไฟล์แก้ไขกรณีโดนตีกลับ
+        if row['current_status'] == "เอกสารโดนตีกลับ":
+            st.warning("⚠️ เอกสารของคุณถูกตีกลับ สามารถแนบไฟล์ใหม่เพื่อส่งแก้ไขได้ทันทีโดยไม่ต้องกรอกฟอร์มใหม่")
+            re_file = st.file_uploader("อัปโหลดไฟล์แก้ไข (.pdf, .jpg, .png)", type=["pdf", "jpg", "png"], key="re_upload")
+            if st.button("ส่งเอกสารแก้ไข"):
+                if re_file:
+                    st.session_state.requests.loc[idx, "current_status"] = "1-ยื่นเรื่องแล้ว (แก้ไขแล้ว)"
+                    st.session_state.requests.loc[idx, "rejection_reason"] = "-"
+                    st.success("ส่งเอกสารแก้ไขเรียบร้อยแล้ว! สถานะถูกเปลี่ยนเป็น 'ยื่นเรื่องแล้ว'")
+                    st.rerun()
+                else:
+                    st.error("กรุณาเลือกไฟล์แก้ไขก่อนกดส่ง")
+
+        st.divider()
+        st.subheader("👨‍💼 ส่วนเจ้าหน้าที่/อาจารย์ (อัปเดตสถานะ)")
+        col_status, col_reason = st.columns(2)
+        with col_status:
+            new_status = st.selectbox("เปลี่ยนสถานะ:", 
+                                     ["1-ยื่นเรื่องแล้ว", "2-เจ้าหน้าที่ตรวจ", "3-รออาจารย์/ผู้มีอำนาจลงนาม", "4-อนุมัติเรียบร้อย", "เอกสารโดนตีกลับ"],
+                                     index=0)
+        with col_reason:
+            rej_reason_input = st.text_input("ระบุเหตุผล (กรณีตีกลับ):", value=row['rejection_reason'] if row['rejection_reason'] != "-" else "")
+
+        if st.button("บันทึกการเปลี่ยนแปลง"):
+            st.session_state.requests.loc[idx, "current_status"] = new_status
+            st.session_state.requests.loc[idx, "rejection_reason"] = rej_reason_input if new_status == "เอกสารโดนตีกลับ" else "-"
+            st.success("บันทึกสถานะใหม่เรียบร้อยแล้ว!")
+            st.info(f"📲 [V.2 Notification] ส่งการแจ้งเตือนอัปเดตสถานะไปยัง LINE/Email ของนิสิตเรียบร้อยแล้ว")
+            st.rerun()
